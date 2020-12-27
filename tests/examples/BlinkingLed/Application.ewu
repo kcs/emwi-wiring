@@ -1,0 +1,165 @@
+﻿$version 10.00
+
+// This is the root component of the entire GUI application.
+$rect <20,70,220,110>
+$output false
+class Application : Core::Root
+{
+  $rect <510,230,700,270>
+  inherited method Init()
+  {
+    uc.pinMode( 13, Wiring::PinModes.OUTPUT );
+  }
+
+  $rect <500,0,700,40>
+  inherited property Bounds = <0,0,480,272>;
+
+  $rect <500,40,700,80>
+  object Core::Timer Timer
+  {
+    preset OnTrigger = toggle;
+    preset Period = 100;
+    preset Enabled = true;
+  }
+
+  $rect <700,40,900,80>
+  slot toggle
+  {
+    ledState = !ledState;
+    uc.digitalWrite( 13, ledState );
+  }
+
+  $rect <700,0,900,40>
+  var bool ledState = false;
+
+  $rect <20,20,160,60>
+  object Views::Rectangle Background
+  {
+    preset Bounds = <0,0,480,272>;
+    preset Color = #5F5F5FFF;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Text TextInterval
+  {
+    preset Bounds = <117,15,353,115>;
+    preset String = "0.1 s";
+    preset Font = Application::Font;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Text TextFrequency
+  {
+    preset Bounds = <117,145,353,245>;
+    preset String = "5 Hz";
+    preset Font = Application::Font;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Frame FrameMinus
+  {
+    preset Bounds = <17,15,117,115>;
+    preset Bitmap = Resources::DefaultFrame;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Frame FramePlus
+  {
+    preset Bounds = <353,15,453,115>;
+    preset Bitmap = Resources::DefaultFrame;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Image ImageMinus
+  {
+    preset Bounds = <25,23,109,107>;
+    preset AutoSize = true;
+    preset Color = #0000FFFF;
+    preset FrameNumber = 19;
+    preset Bitmap = Resources::NavigationIconsExtraLarge;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Image ImagePlus
+  {
+    preset Bounds = <361,23,445,107>;
+    preset AutoSize = true;
+    preset Color = #FF8000FF;
+    preset FrameNumber = 18;
+    preset Bitmap = Resources::NavigationIconsExtraLarge;
+  }
+
+  $rect <20,20,160,60>
+  object Core::SimpleTouchHandler MinusHandler
+  {
+    preset Point4 = <17,15>;
+    preset Point3 = <117,15>;
+    preset Point2 = <117,115>;
+    preset Point1 = <17,115>;
+    preset OnPress = decrement;
+  }
+
+  $rect <20,20,160,60>
+  object Core::SimpleTouchHandler PlusHandler
+  {
+    preset Point4 = <353,14>;
+    preset Point3 = <453,14>;
+    preset Point2 = <453,114>;
+    preset Point1 = <353,114>;
+    preset OnPress = increment;
+  }
+
+  $rect <500,80,700,120>
+  slot decrement
+  {
+    if ( Timer.Period > 100 )
+      Timer.Period = Timer.Period - 100;
+
+    var float interval = (float)Timer.Period / 1000.0;
+
+    TextInterval.String = string(interval, 0, 1) + " s";
+    TextFrequency.String = string(0.5 / interval, 0, 2) + " Hz";
+
+  }
+
+  $rect <500,120,700,160>
+  slot increment
+  {
+    if ( Timer.Period < 2000 )
+      Timer.Period = Timer.Period + 100;
+
+    var float interval = (float)Timer.Period / 1000.0;
+
+    TextInterval.String = string(interval, 0, 1) + " s";
+    TextFrequency.String = string(0.5 / interval, 0, 2) + " Hz";
+
+  }
+
+  $rect <710,230,910,270>
+  object Wiring::Core uc;
+}
+
+// This Unit contains the example application which the digitalWrite() function from \
+// the Wiring::Core functions
+// to periodically turn on and off the on-board LED connected to pin 13.
+note legend Note1
+{
+  attr Bounds = <20,0,710,60>;
+}
+
+// This is a font resource.
+$rect <230,70,430,110>
+$output false
+resource Resources::Font Font
+{
+  attr fontname FontName = Impact;
+  attr fontheight Height = 80;
+  attr fontquality Quality = High;
+  attr fontranges Ranges = 0x20-0xFF;
+  attr fontaspectratio AspectRatio = 1.0;
+  attr fontbold Bold = true;
+  attr fontitalic Italic = false;
+  attr fontkerning Kerning = true;
+  attr fontheightmode HeightMode = Compatible;
+  attr fontrowdistance RowDistance;
+}

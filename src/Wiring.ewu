@@ -1,0 +1,101 @@
+﻿$version 10.00
+
+$rect <10,0,210,40>
+inline HAL_Includes
+{
+  #include <stm32f7xx_hal.h>
+}
+
+$rect <10,50,210,90>
+$output false
+class Core : Templates::DeviceClass
+{
+  // Core Wiring functions
+  note group Note1
+  {
+    attr Bounds = <10,10,230,350>;
+  }
+
+  // This method implements a device command.
+  $rect <20,100,220,140>
+  method void digitalWrite( arg int32 aPin, arg bool aState )
+  {
+    // The following dummy code is used during prototyping only.
+    // Currently no device specific API is used during prototyping.
+    $if $prototyper
+      aPin;
+      aState;
+    $endif
+
+    // Target code generation will use native code to interact with HAL 
+    $if !$prototyper
+      native ( aPin, aState )
+      {
+        HAL_GPIO_WritePin( GPIOI, GPIO_PIN_1, aState );
+      }
+    $endif
+  }
+
+  // This method implements a device command.
+  $rect <20,60,220,100>
+  method void pinMode( arg int32 aPin, arg Wiring::PinModes aMode )
+  {
+    // The following dummy code is used during prototyping only.
+    // Currently no device specific API is used during prototyping.
+    $if $prototyper
+      aPin;
+      aMode;
+    $endif
+
+    // Target code generation will use native code to interact with HAL 
+    $if !$prototyper
+
+      /* TODO:
+         close alternate function (analog generators)
+      */
+      var uint32 mode;
+      var uint32 pull;
+      switch (aMode)
+      {
+        case Wiring::PinModes.OUTPUT:
+        {
+          mode = 1;
+          pull = 0;
+        }
+        default:
+        {
+          mode = 0;
+          pull = 0;
+        }
+      }
+      native ( aPin, mode, pull )
+      {
+        GPIO_InitTypeDef init;
+
+        /* enable port clock */
+        __HAL_RCC_GPIOI_CLK_ENABLE();
+
+        /* initialize pin */
+        init.Pin = GPIO_PIN_1;
+        init.Mode = mode;
+        init.Pull = pull;
+        init.Speed = GPIO_SPEED_HIGH;
+        HAL_GPIO_Init( GPIOI, &init );
+      }
+    $endif
+  }
+}
+
+$rect <220,50,420,90>
+$output false
+enum PinModes
+{
+  $rect <10,10,210,50>
+  item OUTPUT;
+
+  $rect <10,50,210,90>
+  item INPUT;
+
+  $rect <10,90,210,130>
+  item INPUT_PULLUP;
+}
