@@ -8,7 +8,11 @@ class Application : Core::Root
   $rect <510,230,700,270>
   inherited method Init()
   {
-    uc.pinMode( 13, Wiring::PinModes.OUTPUT );
+    uc.pinMode( 2, Wiring::PinModes.OUTPUT );
+    uc.pinMode( 3, Wiring::PinModes.OUTPUT );
+    uc.pinMode( 7, Wiring::PinModes.OUTPUT );
+    uc.pinMode( 8, Wiring::PinModes.OUTPUT );
+    uc.pinMode( 20, Wiring::PinModes.OUTPUT );
   }
 
   $rect <500,0,700,40>
@@ -26,7 +30,7 @@ class Application : Core::Root
   slot toggle
   {
     ledState = !ledState;
-    uc.digitalWrite( 13, ledState );
+    uc.digitalWrite( SelectedLed, ledState );
   }
 
   $rect <700,0,900,40>
@@ -44,14 +48,6 @@ class Application : Core::Root
   {
     preset Bounds = <117,15,353,115>;
     preset String = "0.1 s";
-    preset Font = Application::Font;
-  }
-
-  $rect <20,20,160,60>
-  object Views::Text TextFrequency
-  {
-    preset Bounds = <117,145,353,245>;
-    preset String = "5 Hz";
     preset Font = Application::Font;
   }
 
@@ -118,7 +114,6 @@ class Application : Core::Root
     var float interval = (float)Timer.Period / 1000.0;
 
     TextInterval.String = string(interval, 0, 1) + " s";
-    TextFrequency.String = string(0.5 / interval, 0, 2) + " Hz";
 
   }
 
@@ -131,12 +126,191 @@ class Application : Core::Root
     var float interval = (float)Timer.Period / 1000.0;
 
     TextInterval.String = string(interval, 0, 1) + " s";
-    TextFrequency.String = string(0.5 / interval, 0, 2) + " Hz";
 
   }
 
-  $rect <710,230,910,270>
+  $rect <700,230,900,270>
   object Wiring::Core uc;
+
+  $rect <20,20,160,60>
+  object Views::Rectangle Rectangle
+  {
+    preset Bounds = <17,160,117,260>;
+    preset Color = #2B2B2BFF;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Text Text1
+  {
+    preset Bounds = <17,160,117,260>;
+    preset String = "1";
+    preset Font = Application::Font;
+  }
+
+  $rect <20,20,160,60>
+  object Core::SimpleTouchHandler Handler1
+  {
+    preset Point4 = <17,160>;
+    preset Point3 = <117,160>;
+    preset Point2 = <117,260>;
+    preset Point1 = <17,260>;
+    preset OnPress = SelectLed;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Rectangle Rectangle1
+  {
+    preset Bounds = <129,160,229,260>;
+    preset Color = #2B2B2BFF;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Text Text2
+  {
+    preset Bounds = <129,160,229,260>;
+    preset String = "2";
+    preset Font = Application::Font;
+  }
+
+  $rect <20,20,160,60>
+  object Core::SimpleTouchHandler Handler2
+  {
+    preset Point4 = <129,160>;
+    preset Point3 = <229,160>;
+    preset Point2 = <229,260>;
+    preset Point1 = <129,260>;
+    preset OnPress = SelectLed;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Rectangle Rectangle2
+  {
+    preset Bounds = <240,159,340,259>;
+    preset Color = #2B2B2BFF;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Text Text3
+  {
+    preset Bounds = <240,159,340,259>;
+    preset String = "3";
+    preset Font = Application::Font;
+  }
+
+  $rect <20,20,160,60>
+  object Core::SimpleTouchHandler Handler3
+  {
+    preset Point4 = <240,159>;
+    preset Point3 = <340,159>;
+    preset Point2 = <340,259>;
+    preset Point1 = <240,259>;
+    preset OnPress = SelectLed;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Rectangle Rectangle3
+  {
+    preset Bounds = <352,159,452,259>;
+    preset Color = #2B2B2BFF;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Text Text4
+  {
+    preset Bounds = <352,159,452,259>;
+    preset String = "4";
+    preset Font = Application::Font;
+  }
+
+  $rect <20,20,160,60>
+  object Core::SimpleTouchHandler Handler4
+  {
+    preset Point4 = <352,159>;
+    preset Point3 = <452,159>;
+    preset Point2 = <452,259>;
+    preset Point1 = <352,259>;
+    preset OnPress = SelectLed;
+  }
+
+  $rect <500,320,700,360>
+  property int32 SelectedLed = 2;
+
+  $rect <500,360,700,400>
+  onset SelectedLed
+  {
+    // The value doesn't change - nothing to do.
+    if ( pure SelectedLed == value )
+      return;
+
+    // turn off old led
+    uc.digitalWrite( pure SelectedLed, false );
+
+    // Remember the property's new value.
+    pure SelectedLed = value;
+
+
+    // set new led accordingly
+    uc.digitalWrite( value, ledState );
+  }
+
+  $rect <700,320,900,360>
+  slot SelectLed
+  {
+    Rectangle.Color = #2B2B2BFF;
+    Rectangle1.Color = #2B2B2BFF;
+    Rectangle2.Color = #2B2B2BFF;
+    Rectangle3.Color = #2B2B2BFF;
+            
+    if ( sender == Handler1 )
+    {
+      if ( SelectedLed == 3 )
+      {
+        SelectedLed = 2;
+      }
+      else
+      {
+        Rectangle.Color = #FF000BFF;
+        SelectedLed = 3;
+      }
+    }
+    else if ( sender == Handler2 )
+    {
+      if ( SelectedLed == 7 )
+      {
+        SelectedLed = 2;
+      }
+      else
+      {
+        Rectangle1.Color = #FF0000FF;
+        SelectedLed = 7;
+      }
+    }
+    else if ( sender == Handler3 )
+    {
+      if ( SelectedLed == 8 )
+      {
+        SelectedLed = 2;
+      }
+      else
+      {
+        Rectangle2.Color = #FF000BFF;
+        SelectedLed = 8;
+      }
+    }
+    else if ( sender == Handler4 )
+    {
+      if ( SelectedLed == 20 )
+      {
+        SelectedLed = 2;
+      }
+      else
+      {
+        Rectangle3.Color = #FF000BFF;
+        SelectedLed = 20;
+      }
+    }
+
+  }
 }
 
 // This Unit contains the example application which the digitalWrite() function from \

@@ -4,14 +4,23 @@ $rect <10,0,210,40>
 inline HAL_Includes
 {
   #include <stm32f7xx_hal.h>
+
+
 }
 
 $rect <10,50,210,90>
 $output false
-class Core : Templates::DeviceClass
+class Core
 {
+  // Internal functions.
+  // Do not use outside the class.
+  note group noteInternal
+  {
+    attr Bounds = <320,150,620,350>;
+  }
+
   // Core Wiring functions
-  note group Note1
+  note group noteCore
   {
     attr Bounds = <10,10,230,350>;
   }
@@ -20,69 +29,33 @@ class Core : Templates::DeviceClass
   $rect <20,100,220,140>
   method void digitalWrite( arg int32 aPin, arg bool aState )
   {
-    // The following dummy code is used during prototyping only.
-    // Currently no device specific API is used during prototyping.
-    $if $prototyper
-      aPin;
-      aState;
-    $endif
+    // get the corresponding pin
+    var Wiring::Pin pin = pins.Pin( aPin );
+    // and set pin state based on aState
+    // false = LOW
+    // true = HIGH
+    if ( pin != null )
+      pin.State = aState ? Wiring::PinState.HIGH : Wiring::PinState.LOW;
 
-    // Target code generation will use native code to interact with HAL 
-    $if !$prototyper
-      native ( aPin, aState )
-      {
-        HAL_GPIO_WritePin( GPIOI, GPIO_PIN_1, aState );
-      }
-    $endif
   }
 
   // This method implements a device command.
   $rect <20,60,220,100>
   method void pinMode( arg int32 aPin, arg Wiring::PinModes aMode )
   {
-    // The following dummy code is used during prototyping only.
-    // Currently no device specific API is used during prototyping.
-    $if $prototyper
-      aPin;
-      aMode;
-    $endif
+    var Wiring::Pin pin = pins.Pin( aPin );
+    if ( pin != null )
+      pin.Mode = aMode;
 
-    // Target code generation will use native code to interact with HAL 
-    $if !$prototyper
+  }
 
-      /* TODO:
-         close alternate function (analog generators)
-      */
-      var uint32 mode;
-      var uint32 pull;
-      switch (aMode)
-      {
-        case Wiring::PinModes.OUTPUT:
-        {
-          mode = 1;
-          pull = 0;
-        }
-        default:
-        {
-          mode = 0;
-          pull = 0;
-        }
-      }
-      native ( aPin, mode, pull )
-      {
-        GPIO_InitTypeDef init;
+  $rect <690,220,890,260>
+  var Wiring::PinsClass pins = Wiring::Pins;
 
-        /* enable port clock */
-        __HAL_RCC_GPIOI_CLK_ENABLE();
-
-        /* initialize pin */
-        init.Pin = GPIO_PIN_1;
-        init.Mode = mode;
-        init.Pull = pull;
-        init.Speed = GPIO_SPEED_HIGH;
-        HAL_GPIO_Init( GPIOI, &init );
-      }
-    $endif
+  // Internal variables.
+  note group noteInternal1
+  {
+    attr Bounds = <640,150,940,350>;
   }
 }
 
@@ -90,12 +63,422 @@ $rect <220,50,420,90>
 $output false
 enum PinModes
 {
-  $rect <10,10,210,50>
-  item OUTPUT;
+  // Not connected pin
+  $rect <10,190,210,230>
+  item NC = 0;
 
-  $rect <10,50,210,90>
+  // Input mode
+  $rect <10,40,210,80>
   item INPUT;
 
-  $rect <10,90,210,130>
+  // Input mode with pullup enabled
+  $rect <210,40,410,80>
   item INPUT_PULLUP;
+
+  // Input mode with pulldown enabled
+  $rect <410,40,610,80>
+  item INPUT_PULLDOWN;
+
+  // Analog input mode
+  $rect <610,40,810,80>
+  item INPUT_ANALOG;
+
+  // Push-pull output mode
+  $rect <10,80,210,120>
+  item OUTPUT;
+
+  // Open-drain output mode
+  $rect <210,80,410,120>
+  item OUTPUT_OD;
+
+  // Alternate function of the pin. Should not be used directly, but through the \
+  // corresponding peripheral library.
+  $rect <260,190,510,230>
+  item ALTERNATE_FUNCTION;
+
+  // Alternate function of the pin. Should not be used directly, but through the \
+  // corresponding peripheral library.
+  $rect <560,190,810,230>
+  item ALTERNATE_FUNCTION_OD;
+
+  // Mode selection for pins
+  note group Note
+  {
+    attr Bounds = <0,0,820,130>;
+  }
+
+  // Internal settings. Should not be used directly
+  note group Note1
+  {
+    attr Bounds = <0,150,820,240>;
+  }
+}
+
+$rect <500,50,700,90>
+$output false
+class Pin
+{
+  $rect <410,300,610,340>
+  var handle port = null;
+
+  $rect <410,340,610,380>
+  var uint16 pin = 0;
+
+  // Attaches this class to a specific pin. Used only in the Board specific initialization \
+  // variant.
+  $rect <610,300,810,340>
+  method void attach( arg Wiring::Port aPort, arg uint32 aPin )
+  {
+    // avoid warnings in prototyper
+    $if $prototyper
+      aPort;
+      aPin;
+    $endif
+
+    $if !$prototyper
+    var handle h;
+    native (h, aPort)
+    {
+      switch ( aPort )
+      {
+        case WiringPortA:
+          h = (XHandle)GPIOA;
+          __HAL_RCC_GPIOA_CLK_ENABLE();
+          break;
+        case WiringPortB:
+          h = (XHandle)GPIOB;
+          __HAL_RCC_GPIOB_CLK_ENABLE();
+          break;
+        case WiringPortC:
+          h = (XHandle)GPIOC;
+          __HAL_RCC_GPIOC_CLK_ENABLE();
+          break;
+        case WiringPortD:
+          h = (XHandle)GPIOD;
+          __HAL_RCC_GPIOD_CLK_ENABLE();
+          break;
+        case WiringPortE:
+          h = (XHandle)GPIOE;
+          __HAL_RCC_GPIOE_CLK_ENABLE();
+          break;
+        case WiringPortF:
+          h = (XHandle)GPIOF;
+          __HAL_RCC_GPIOF_CLK_ENABLE();
+          break;
+        case WiringPortG:
+          h = (XHandle)GPIOG;
+          __HAL_RCC_GPIOG_CLK_ENABLE();
+          break;
+        case WiringPortH:
+          h = (XHandle)GPIOH;
+          __HAL_RCC_GPIOH_CLK_ENABLE();
+          break;
+        case WiringPortI:
+          h = (XHandle)GPIOI;
+          __HAL_RCC_GPIOI_CLK_ENABLE();
+          break;
+        case WiringPortJ:
+          h = (XHandle)GPIOJ;
+          __HAL_RCC_GPIOJ_CLK_ENABLE();
+          break;
+        case WiringPortK:
+          h = (XHandle)GPIOK;
+          __HAL_RCC_GPIOK_CLK_ENABLE();
+          break;
+        default:
+          h = 0;
+      }
+    }
+    port = h;
+    $endif
+
+    pin = (uint16)(1 << aPin);
+
+  }
+
+  $rect <0,0,200,40>
+  property Wiring::PinModes Mode;
+
+  $rect <0,40,200,80>
+  onset Mode
+  {
+    // The value doesn't change - nothing to do.
+    if ( pure Mode == value )
+      return;
+
+    // Remember the property's new value.
+    pure Mode = value;
+
+    // if pin is attached to a hardware pin, apply the settings
+    $if !$prototyper
+    if ( port != null )
+    {
+      var handle h = port;
+      var uint16 i = pin;
+      var uint32 mode = 0;
+      var uint32 pull = 0;
+      switch ( value )
+      {
+        case Wiring::PinModes.INPUT_PULLUP: pull = 1;
+        case Wiring::PinModes.INPUT_PULLDOWN: pull = 2;
+        case Wiring::PinModes.OUTPUT: mode = 1;
+        case Wiring::PinModes.OUTPUT_OD: mode = 0x11;
+        default: ;
+      }
+
+      native ( h, i, mode, pull )
+      {
+        GPIO_InitTypeDef init;
+
+        /* enable port clock */
+        __HAL_RCC_GPIOI_CLK_ENABLE();
+
+        /* initialize pin */
+        init.Pin = i;
+        init.Mode = mode;
+        init.Pull = pull;
+        init.Speed = GPIO_SPEED_HIGH;
+        HAL_GPIO_Init( (GPIO_TypeDef *)h, &init );
+      }
+    }
+
+
+
+    $endif
+  }
+
+  $rect <200,0,400,40>
+  property Wiring::PinState State;
+
+  $rect <200,40,400,80>
+  onset State
+  {
+    // The value doesn't change - nothing to do.
+    if ( pure State == value )
+      return;
+
+    // Remember the property's new value.
+    pure State = value;
+
+    // set the corresponding state to the underlying hardware
+    $if !$prototyper
+    if ( port != null && value != Wiring::PinState.UNDEFINED && ( pure Mode == Wiring::PinModes.OUTPUT || pure Mode == Wiring::PinModes.OUTPUT_OD ))
+    {
+      var bool state = value == Wiring::PinState.HIGH;
+      var handle h = port;
+      var uint16 p = pin;
+      native ( h, p, state )
+      {
+        HAL_GPIO_WritePin( (GPIO_TypeDef *)h, p, (GPIO_PinState)state);
+      }
+    }
+    $endif
+
+  }
+
+  $rect <200,80,400,120>
+  onget State
+  {
+    return pure State;
+  }
+}
+
+// Pin naming convention
+$rect <220,130,420,170>
+$output false
+enum PinNames
+{
+  $rect <10,10,210,50>
+  item PA_0 = 0x10001;
+
+  $rect <10,50,210,90>
+  item PA_1 = 0x10002;
+
+  $rect <10,90,210,130>
+  item PA_2 = 0x10004;
+
+  $rect <10,130,210,170>
+  item PA_3 = 0x10008;
+
+  $rect <10,170,210,210>
+  item PA_4;
+
+  $rect <10,210,210,250>
+  item PA_5;
+
+  $rect <10,250,210,290>
+  item PA_6;
+
+  $rect <10,290,210,330>
+  item PA_7;
+
+  $rect <10,330,210,370>
+  item PA_8;
+
+  $rect <10,370,210,410>
+  item PA_9;
+
+  $rect <10,410,210,450>
+  item PA_10;
+
+  $rect <10,450,210,490>
+  item PA_11;
+
+  $rect <10,490,210,530>
+  item PA_12;
+
+  $rect <10,530,210,570>
+  item PA_13;
+
+  $rect <10,570,210,610>
+  item PA_14;
+
+  $rect <10,610,210,650>
+  item PA_15;
+}
+
+$rect <220,90,420,130>
+$output false
+enum Port
+{
+  $rect <10,10,210,50>
+  item A;
+
+  $rect <10,50,210,90>
+  item B;
+
+  $rect <10,90,210,130>
+  item C;
+
+  $rect <10,130,210,170>
+  item D;
+
+  $rect <10,170,210,210>
+  item E;
+
+  $rect <10,210,210,250>
+  item F;
+
+  $rect <10,250,210,290>
+  item G;
+
+  $rect <10,290,210,330>
+  item H;
+
+  $rect <10,330,210,370>
+  item I;
+
+  $rect <10,370,210,410>
+  item J;
+
+  $rect <10,410,210,450>
+  item K;
+}
+
+$rect <500,90,700,130>
+$output false
+class PinsClass
+{
+  // This method will return a Pin object corresponding to the given pin number.
+  $rect <0,0,200,40>
+  method Wiring::Pin Pin( arg int32 aPin )
+  {
+    /* this should be overwritten in the board specific variant */
+    aPin;
+    throw "Unimplemented base class method";
+
+  }
+}
+
+// Pin mapping on the STM23F746NG Discovery board
+$rect <700,90,940,130>
+$variant STM32F746
+vclass Pins_STM32F746_DISCO : Wiring::PinsClass
+{
+  $rect <0,0,200,40>
+  inherited method Init()
+  {
+    pins[0].attach( Wiring::Port.C, 7 );
+    pins[1].attach( Wiring::Port.C, 6 );
+    pins[2].attach( Wiring::Port.G, 6 );
+    pins[3].attach( Wiring::Port.B, 4 );
+    pins[4].attach( Wiring::Port.G, 7 );
+    pins[5].attach( Wiring::Port.I, 0 );
+    pins[6].attach( Wiring::Port.H, 6 );
+    pins[7].attach( Wiring::Port.I, 3 );
+    pins[8].attach( Wiring::Port.I, 2 );
+    pins[9].attach( Wiring::Port.A, 15 );
+    pins[10].attach( Wiring::Port.A, 8 );
+    pins[11].attach( Wiring::Port.B, 15 );
+    pins[12].attach( Wiring::Port.B, 14 );
+    pins[13].attach( Wiring::Port.I, 1 );
+    pins[14].attach( Wiring::Port.B, 9 );
+    pins[15].attach( Wiring::Port.B, 8 );
+    pins[16].attach( Wiring::Port.A, 0 );
+    pins[17].attach( Wiring::Port.F, 10 );
+    pins[18].attach( Wiring::Port.F, 9 );
+    pins[19].attach( Wiring::Port.F, 8 );
+    pins[20].attach( Wiring::Port.F, 7 );
+    pins[21].attach( Wiring::Port.F, 6 );
+
+  }
+
+  $rect <0,40,200,80>
+  inherited method Pin()
+  {
+    if ( aPin >= 0 && aPin < pins.size )
+      return pins[aPin];
+    else
+      return null;
+
+  }
+
+  $rect <207,4,407,44>
+  array Wiring::Pin pins[ 22 ] =
+  (
+    Default[0] = new Wiring::Pin;
+    Default[1] = new Wiring::Pin;
+    Default[2] = new Wiring::Pin;
+    Default[3] = new Wiring::Pin;
+    Default[4] = new Wiring::Pin;
+    Default[5] = new Wiring::Pin;
+    Default[6] = new Wiring::Pin;
+    Default[7] = new Wiring::Pin;
+    Default[8] = new Wiring::Pin;
+    Default[9] = new Wiring::Pin;
+    Default[10] = new Wiring::Pin;
+    Default[11] = new Wiring::Pin;
+    Default[12] = new Wiring::Pin;
+    Default[13] = new Wiring::Pin;
+    Default[14] = new Wiring::Pin;
+    Default[15] = new Wiring::Pin;
+    Default[16] = new Wiring::Pin;
+    Default[17] = new Wiring::Pin;
+    Default[18] = new Wiring::Pin;
+    Default[19] = new Wiring::Pin;
+    Default[20] = new Wiring::Pin;
+    Default[21] = new Wiring::Pin;
+  );
+}
+
+$rect <500,130,700,170>
+$output false
+autoobject Wiring::PinsClass Pins;
+
+// Enumeration of the possible pin states. Pin can be set to HIGH (resulting in a \
+// logical 1 on the output), LOW (resulting a logical 0 on output) or UNDEFINED (this \
+// has no effect on the output pin, and can appear when pin is routed to an alternate \
+// function).
+$rect <220,170,420,210>
+$output false
+enum PinState
+{
+  $rect <10,10,210,50>
+  item UNDEFINED;
+
+  $rect <10,50,210,90>
+  item LOW;
+
+  $rect <10,90,210,130>
+  item HIGH;
 }
