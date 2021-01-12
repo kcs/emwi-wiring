@@ -34,7 +34,10 @@ class Core
     attr Bounds = <10,10,230,350>;
   }
 
-  // This method implements a device command.
+  // This method sets (aState = true) or resets (aState = false) a digital output \
+  // pin on the Arduino connector.
+  // Pins are identified by their pin number, digital pins 0 to 15, analog pins 16-21.
+
   $rect <20,100,220,140>
   method void digitalWrite( arg int32 aPin, arg bool aState )
   {
@@ -48,7 +51,16 @@ class Core
 
   }
 
-  // This method implements a device command.
+  // This method configures a pin from the Arduino connector.
+  // Pins are identified by their pin number, digital pins 0 to 15, analog pins 16-21.
+  // Possible modes:
+  // Wiring::PinModes.INPUT - simple digital input
+  // Wiring::PinModes.INPUT_PULLUP - simple digital input with internal pullup enabled
+  // Wiring::PinModes.INPUT_PULLDOWN - simple digital input with internal pulldown \
+  // enabled
+  // Wiring::PinModes.OUTPUT - simple digital output in push-pull mode
+  // Wiring::PinModes.OUTPUT_OD - simple digital output in open-drain mode
+  // Wiring::PinModes.ANALOG_INPUT - analog (ADC) input mode
   $rect <20,60,220,100>
   method void pinMode( arg int32 aPin, arg Wiring::PinModes aMode )
   {
@@ -58,7 +70,9 @@ class Core
 
   }
 
-  // This method implements a device command.
+  // This method reads the state of a digital input pin on the Arduino connector.
+  // Pins are identified by their pin number, digital pins 0 to 15, analog pins 16-21.
+  // Returns true if the pin is high, false if low.
   $rect <20,140,220,180>
   method bool digitalRead( arg int32 aPin )
   {
