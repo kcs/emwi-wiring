@@ -115,9 +115,3 @@ unit Wiring
 {
   attr Directory = ..\..\..\src;
 }
-
-$rect <40,270,240,310>
-unit Templates
-{
-  attr Directory = $Mosaic\;
-}

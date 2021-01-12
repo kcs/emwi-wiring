@@ -19,6 +19,15 @@ class Core
     attr Bounds = <320,150,620,350>;
   }
 
+  // Internal variables.
+  note group noteInternal1
+  {
+    attr Bounds = <640,150,940,350>;
+  }
+
+  $rect <690,220,890,260>
+  var Wiring::PinsClass pins = Wiring::Pins;
+
   // Core Wiring functions
   note group noteCore
   {
@@ -49,13 +58,21 @@ class Core
 
   }
 
-  $rect <690,220,890,260>
-  var Wiring::PinsClass pins = Wiring::Pins;
-
-  // Internal variables.
-  note group noteInternal1
+  // This method implements a device command.
+  $rect <20,140,220,180>
+  method bool digitalRead( arg int32 aPin )
   {
-    attr Bounds = <640,150,940,350>;
+    // get the corresponding pin
+    var Wiring::Pin pin = pins.Pin( aPin );
+    // and set pin state based on aState
+    // false = LOW
+    // true = HIGH
+    if ( pin != null )
+      return pin.State == Wiring::PinState.HIGH;
+
+    // if pin is not connected, always return false
+    return false;
+
   }
 }
 
@@ -279,7 +296,30 @@ class Pin
   $rect <200,80,400,120>
   onget State
   {
+    $if $prototyper
     return pure State;
+    $endif
+
+    $if !$prototyper
+    // in inpput mode read directly from the the pin
+    if ( pure Mode == Wiring::PinModes.INPUT ||
+         pure Mode == Wiring::PinModes.INPUT_PULLUP ||
+         pure Mode == Wiring::PinModes.INPUT_PULLDOWN )
+    {
+      var bool state;
+      var handle h = port;
+      var uint16 p = pin;
+      native (state, h, p)
+      {
+        state = (XBool)HAL_GPIO_ReadPin((GPIO_TypeDef *)h, p);
+      }
+      return state ? Wiring::PinState.HIGH : Wiring::PinState.LOW;
+    }
+    else
+    {
+      return pure State;
+    }
+    $endif
   }
 }
 
