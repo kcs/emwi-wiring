@@ -1,0 +1,99 @@
+﻿$version 10.00
+
+// This is the root component of the entire GUI application.
+$rect <20,70,220,110>
+$output false
+class Application : Core::Root
+{
+  $rect <510,230,700,270>
+  inherited method Init()
+  {
+    uc.pinMode( 20, Wiring::PinModes.INPUT_ANALOG );
+    uc.pinMode( 21, Wiring::PinModes.INPUT_ANALOG );
+
+    uc.pinMode( 3, Wiring::PinModes.OUTPUT );
+    uc.digitalWrite( 3, true );
+
+  }
+
+  $rect <500,0,700,40>
+  inherited property Bounds = <0,0,480,272>;
+
+  $rect <500,40,700,80>
+  object Core::Timer Timer
+  {
+    preset OnTrigger = updatePos;
+    preset Period = 40;
+    preset Enabled = true;
+  }
+
+  $rect <700,40,900,80>
+  slot updatePos
+  {
+    var uint32 x = uc.analogRead( 21 );
+    var uint32 y = uc.analogRead( 20 );
+
+
+  }
+
+  $rect <20,20,160,60>
+  object Views::Rectangle Background
+  {
+    preset Bounds = <0,0,480,272>;
+    preset Color = #5F5F5FFF;
+  }
+
+  $rect <700,230,900,270>
+  object Wiring::Core uc;
+
+  $rect <20,20,160,60>
+  object Views::Line Line
+  {
+    preset Point2 = <480,136>;
+    preset Point1 = <0,136>;
+    preset Width = 2;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Line Line1
+  {
+    preset Point2 = <240,272>;
+    preset Point1 = <240,0>;
+    preset Width = 2;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Image Image
+  {
+    preset Bounds = <338,152,388,202>;
+    preset AutoSize = true;
+    preset Color = #FFA000FF;
+    preset FrameNumber = 12;
+    preset Bitmap = Resources::SymbolIconsExtraLarge;
+  }
+}
+
+// This Unit contains the example application which reads periodically the analog \
+// inputs A5 and A6
+// and moves around a spot based on their value.
+note legend Note1
+{
+  attr Bounds = <20,0,710,60>;
+}
+
+// This is a font resource.
+$rect <230,70,430,110>
+$output false
+resource Resources::Font Font
+{
+  attr fontname FontName = Impact;
+  attr fontheight Height = 80;
+  attr fontquality Quality = High;
+  attr fontranges Ranges = 0x20-0xFF;
+  attr fontaspectratio AspectRatio = 1.0;
+  attr fontbold Bold = true;
+  attr fontitalic Italic = false;
+  attr fontkerning Kerning = true;
+  attr fontheightmode HeightMode = Compatible;
+  attr fontrowdistance RowDistance;
+}

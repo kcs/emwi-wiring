@@ -16,7 +16,7 @@ class Core
   // Do not use outside the class.
   note group noteInternal
   {
-    attr Bounds = <320,150,620,350>;
+    attr Bounds = <640,360,940,560>;
   }
 
   // Internal variables.
@@ -37,7 +37,6 @@ class Core
   // This method sets (aState = true) or resets (aState = false) a digital output \
   // pin on the Arduino connector.
   // Pins are identified by their pin number, digital pins 0 to 15, analog pins 16-21.
-
   $rect <20,100,220,140>
   method void digitalWrite( arg int32 aPin, arg bool aState )
   {
@@ -66,8 +65,9 @@ class Core
   {
     var Wiring::Pin pin = pins.Pin( aPin );
     if ( pin != null )
+    {
       pin.Mode = aMode;
-
+    }
   }
 
   // This method reads the state of a digital input pin on the Arduino connector.
@@ -87,6 +87,167 @@ class Core
     // if pin is not connected, always return false
     return false;
 
+  }
+
+  // This function sets the resolution for any further analog reads. Resolution in \
+  // specified in the number of bits (between 1 and 32).
+  // If the hardware does not support the given resolution then a lower resolution \
+  // will be used on the actual read and then upscaled to the requested resolution.
+  $rect <20,210,220,250>
+  method int32 analogReadResolution( arg int32 aResolution )
+  {
+    /* The template just returns the given argument... */
+    return aResolution;
+  }
+
+  $rect <690,260,890,300>
+  var uint32 adc_resolution = 0;
+
+  // Core Wiring properties
+  note group noteCore1
+  {
+    attr Bounds = <240,10,460,350>;
+  }
+
+  $rect <250,210,450,250>
+  property int32 AnalogReadResolution;
+
+  $rect <250,250,450,290>
+  onset AnalogReadResolution
+  {
+    // make sure it is within range
+    if ( value < 1 )
+      value = 1;
+    if ( value > 32 )
+      value = 32;
+
+    // The value doesn't change - nothing to do.
+    if ( pure AnalogReadResolution == value )
+      return;
+
+    // Remember the property's new value.
+    pure AnalogReadResolution = value;
+
+    // also configure the adc_resolution
+    selectADCResolution( value );
+
+
+  }
+
+  $rect <680,440,880,480>
+  method void selectADCResolution( arg int32 aRes )
+  {
+    // this function will select the best suited ADC resolution available on the underlying hardware
+    var uint32 res = 0; // store the underlying configuration
+    var int32 corr = 0; // correction factor to be used when converting to the requested resolution
+
+    native ( res, corr, aRes )
+    {
+    #ifdef ADC_RESOLUTION_6B
+      if ( aRes <= 6 )
+      {
+        res = ADC_RESOLUTION_6B;
+        corr = aRes - 6;
+      }
+      else
+    #endif
+    #ifdef ADC_RESOLUTION_8B
+      if ( aRes <= 8 )
+      {
+        res = ADC_RESOLUTION_8B;
+        corr = aRes - 8;
+      }
+      else
+    #endif
+    #ifdef ADC_RESOLUTION_10B
+      if ( aRes <= 10 )
+      {
+        res = ADC_RESOLUTION_10B;
+        corr = aRes - 10;
+      }
+      else
+    #endif
+    #ifdef ADC_RESOLUTION_12B
+      if ( aRes <= 12 )
+      {
+        res = ADC_RESOLUTION_12B;
+        corr = aRes - 12;
+      }
+      else
+    #endif
+    #ifdef ADC_RESOLUTION_14B
+      if ( aRes <= 14 )
+      {
+        res = ADC_RESOLUTION_14B;
+        corr = aRes - 14;
+      }
+      else
+    #endif
+    #ifdef ADC_RESOLUTION_16B
+      if ( aRes <= 16 )
+      {
+        res = ADC_RESOLUTION_16B;
+        corr = aRes - 16;
+      }
+      else
+    #endif
+      {
+        res = 0;
+    #if defined(ADC_RESOLUTION_6B) && !ADC_RESOLUTION_6B
+        corr = aRes - 6;
+    #elif defined(ADC_RESOLUTION_8B) && !ADC_RESOLUTION_8B
+        corr = aRes - 8;
+    #elif defined(ADC_RESOLUTION_10B) && !ADC_RESOLUTION_10B
+        corr = aRes - 10;
+    #elif defined(ADC_RESOLUTION_12B) && !ADC_RESOLUTION_12B
+        corr = aRes - 12;
+    #elif defined(ADC_RESOLUTION_14B) && !ADC_RESOLUTION_14B
+        corr = aRes - 14;
+    #elif defined(ADC_RESOLUTION_16B) && !ADC_RESOLUTION_16B
+        corr = aRes - 16;
+    #endif
+      }
+    } 
+            
+    adc_resolution = res;
+    adc_correction = corr;
+
+  }
+
+  $rect <690,300,890,340>
+  var int32 adc_correction = 0;
+
+  // Read the ADC conversion result from an analog input pin. Sampling will not work \
+  // if pin is not configured correctly.
+  $rect <19,251,219,291>
+  method uint32 analogRead( arg int32 aPin )
+  {
+    // find the ADC needed
+    var Wiring::Adc adc = pins.Adc( aPin );
+    if ( adc == null )
+    {
+      return 0;
+    }
+
+    // perform a single conversion
+    var uint16 a = adc.ReadAdcValue( adc_resolution );
+
+    // and correct for the requested resolution
+    if ( adc_correction == 0 )
+    {
+      return (uint32)a;
+    }
+    else if ( adc_correction > 0 )
+    {
+      // make a skewed bit shifting, so 0 will end up always 0, and MAX-1 will always end up with all bits of 1
+      return (((uint32)a + 1) << adc_correction ) - 1;
+    }
+    else
+    {
+      if ( a < ( 1 << -adc_correction ))
+        return 0;
+      return (((uint32)a + 1) >> -adc_correction ) - 1;
+    }
   }
 }
 
@@ -149,15 +310,15 @@ $rect <500,50,700,90>
 $output false
 class Pin
 {
-  $rect <410,300,610,340>
+  $rect <0,160,200,200>
   var handle port = null;
 
-  $rect <410,340,610,380>
+  $rect <0,200,200,240>
   var uint16 pin = 0;
 
   // Attaches this class to a specific pin. Used only in the Board specific initialization \
   // variant.
-  $rect <610,300,810,340>
+  $rect <200,160,400,200>
   method void attach( arg Wiring::Port aPort, arg uint32 aPin )
   {
     // avoid warnings in prototyper
@@ -254,6 +415,11 @@ class Pin
         case Wiring::PinModes.INPUT_PULLDOWN: pull = 2;
         case Wiring::PinModes.OUTPUT: mode = 1;
         case Wiring::PinModes.OUTPUT_OD: mode = 0x11;
+        case Wiring::PinModes.INPUT_ANALOG:
+          native ( mode )
+          {
+            mode = GPIO_MODE_ANALOG;
+          }
         default: ;
       }
 
@@ -337,61 +503,7 @@ class Pin
   }
 }
 
-// Pin naming convention
 $rect <220,130,420,170>
-$output false
-enum PinNames
-{
-  $rect <10,10,210,50>
-  item PA_0 = 0x10001;
-
-  $rect <10,50,210,90>
-  item PA_1 = 0x10002;
-
-  $rect <10,90,210,130>
-  item PA_2 = 0x10004;
-
-  $rect <10,130,210,170>
-  item PA_3 = 0x10008;
-
-  $rect <10,170,210,210>
-  item PA_4;
-
-  $rect <10,210,210,250>
-  item PA_5;
-
-  $rect <10,250,210,290>
-  item PA_6;
-
-  $rect <10,290,210,330>
-  item PA_7;
-
-  $rect <10,330,210,370>
-  item PA_8;
-
-  $rect <10,370,210,410>
-  item PA_9;
-
-  $rect <10,410,210,450>
-  item PA_10;
-
-  $rect <10,450,210,490>
-  item PA_11;
-
-  $rect <10,490,210,530>
-  item PA_12;
-
-  $rect <10,530,210,570>
-  item PA_13;
-
-  $rect <10,570,210,610>
-  item PA_14;
-
-  $rect <10,610,210,650>
-  item PA_15;
-}
-
-$rect <220,90,420,130>
 $output false
 enum Port
 {
@@ -436,6 +548,17 @@ class PinsClass
   // This method will return a Pin object corresponding to the given pin number.
   $rect <0,0,200,40>
   method Wiring::Pin Pin( arg int32 aPin )
+  {
+    /* this should be overwritten in the board specific variant */
+    aPin;
+    throw "Unimplemented base class method";
+
+  }
+
+  // This method return the ADC channel associated with the pin. If there is no ADC \
+  // channel on the requested pin, null is returned.
+  $rect <0,40,200,80>
+  method Wiring::Adc Adc( arg int32 aPin )
   {
     /* this should be overwritten in the board specific variant */
     aPin;
@@ -487,7 +610,71 @@ vclass Pins_STM32F746_DISCO : Wiring::PinsClass
 
   }
 
-  $rect <207,4,407,44>
+  $rect <0,80,200,120>
+  inherited method Adc()
+  {
+    // adc is not implemented in the prototyper
+    $if $prototyper
+      aPin;
+      return null;
+    $endif
+
+    $if !$prototyper
+      var uint32 channel;
+      switch (aPin)
+      {
+        case 16:
+          native (channel)
+          {
+            channel = ADC_CHANNEL_0;
+          }   
+        case 17:
+          native (channel)
+          {
+            channel = ADC_CHANNEL_8;
+          }   
+        case 18:
+          native (channel)
+          {
+            channel = ADC_CHANNEL_7;
+          }   
+        case 19:
+          native (channel)
+          {
+            channel = ADC_CHANNEL_6;
+          }   
+        case 20:
+          native (channel)
+          {
+            channel = ADC_CHANNEL_5;
+          }   
+        case 21:
+          native (channel)
+          {
+            channel = ADC_CHANNEL_4;
+          }   
+        default:
+          return null;
+      }
+
+      if ( adc3 == null )
+      {
+        adc3 = new Wiring::Adc;
+        var handle h;
+        native (h)
+        {
+          h = (XHandle)ADC3;
+          __HAL_RCC_ADC3_CLK_ENABLE();
+        }
+        adc3.instance = h;
+      }
+      adc3.channel = channel;
+      return adc3;
+    $endif
+
+  }
+
+  $rect <200,40,400,80>
   array Wiring::Pin pins[ 22 ] =
   (
     Default[0] = new Wiring::Pin;
@@ -513,6 +700,9 @@ vclass Pins_STM32F746_DISCO : Wiring::PinsClass
     Default[20] = new Wiring::Pin;
     Default[21] = new Wiring::Pin;
   );
+
+  $rect <200,80,400,120>
+  var Wiring::Adc adc3 = null;
 }
 
 $rect <500,130,700,170>
@@ -523,7 +713,7 @@ autoobject Wiring::PinsClass Pins;
 // logical 1 on the output), LOW (resulting a logical 0 on output) or UNDEFINED (this \
 // has no effect on the output pin, and can appear when pin is routed to an alternate \
 // function).
-$rect <220,170,420,210>
+$rect <220,90,420,130>
 $output false
 enum PinState
 {
@@ -535,4 +725,68 @@ enum PinState
 
   $rect <10,90,210,130>
   item HIGH;
+}
+
+$rect <500,170,700,210>
+$output false
+class Adc
+{
+  $rect <0,0,200,40>
+  var handle instance = null;
+
+  $rect <0,40,200,80>
+  var uint32 channel = 0;
+
+  // Perform a single conversion, waiting for the result and returning it;
+  $rect <0,80,200,120>
+  method uint16 ReadAdcValue( arg uint32 aResolution )
+  {
+    $if $prototyper
+      aResolution;
+      return 0;
+    $endif
+
+    $if !$prototyper
+      if ( instance == null )
+        return 0;
+
+      var handle h = instance;
+      var uint32 ch = channel;
+      var uint16 res;
+      
+      native ( res, h, ch, aResolution )
+      {
+        // use default (zeroed) configuration everywhere
+        ADC_HandleTypeDef AdcHandle = {};
+        ADC_ChannelConfTypeDef AdcChannelConf = {};
+        uint32_t c;
+
+        AdcHandle.Instance = (ADC_TypeDef *)h;
+        AdcHandle.Init.Resolution = aResolution;
+        HAL_ADC_Init(&AdcHandle);
+
+        AdcChannelConf.Channel = ch;
+        AdcChannelConf.Rank = ADC_REGULAR_RANK_1;
+        HAL_ADC_ConfigChannel( &AdcHandle, &AdcChannelConf );
+
+        // start conversion
+        HAL_ADC_Start(&AdcHandle);
+        // and wait for finish it, it is not really healthy to do busy waiting in the GUI thread,
+        // but we mimic the simple and inefficient Arduino routines
+        HAL_ADC_PollForConversion( &AdcHandle, 10 );
+        // polling could also end for some unforeseen reasons, so only continue if it terminated
+        // at end-of-conversion
+        c = HAL_ADC_GetState( &AdcHandle );
+        if ( ( c & HAL_ADC_STATE_REG_EOC ) == HAL_ADC_STATE_REG_EOC )
+        {
+          res = HAL_ADC_GetValue( &AdcHandle );
+        }
+        // another rather inefficient Arduino handling, we start every conversion from initial setup
+        // so in the end we also break down the setup
+        HAL_ADC_Stop( &AdcHandle );
+        HAL_ADC_DeInit( &AdcHandle );
+      }
+      return res;
+    $endif
+  }
 }
