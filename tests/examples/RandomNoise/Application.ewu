@@ -1,0 +1,325 @@
+﻿$version 10.00
+
+// This is the root component of the entire GUI application.
+$rect <20,70,220,110>
+$output false
+class Application : Core::Root
+{
+  $rect <500,0,700,40>
+  inherited method Init()
+  {
+    Path.InitSubPath( 0, 128 );
+    Spectrum.InitSubPath( 0, 64 );
+    Path.Begin( 0, 0.0, (float)( uc.random() >> 16 ) /  655.36 );
+
+  }
+
+  $rect <500,40,700,80>
+  inherited property Bounds = <0,0,480,272>;
+
+  $rect <500,80,700,120>
+  object Core::Timer Timer
+  {
+    preset OnTrigger = nextSample;
+    preset Period = 20;
+    preset Enabled = true;
+  }
+
+  $rect <700,80,900,120>
+  slot nextSample
+  {
+    var float sample = (float)( uc.random() >> 16 ) /  655.36 - 50.0;
+    var float step = (float)StrokePath.Bounds.w / 128.0;
+
+    if ( Path.GetNoOfFreeEdges( 0 ) == 0 )
+      Path.ShiftNodes( 0, 1, -step, 0.0 );
+
+    var float x = Path.GetNodeX( 0, Path.GetNoOfEdges( 0 ) );
+    Path.AddLine( 0, x + step, sample );
+
+    // and calculate the fft of the samples
+    fft();
+
+  }
+
+  $rect <700,120,900,160>
+  method void fft()
+  {
+    // perform fft calculation on the sample data from Path
+    // this is the most basic Cooley-Tuckey implementation as found in Numerical Recipes in C++
+    // converted to chora
+
+    array float datar[128];
+    array float datai[128];
+
+    var int32 mmax;
+    var int32 m;
+    var int32 j;
+    var int32 istep;
+    var int32 i;
+
+    var float wtemp;
+    var float wr;
+    var float wpr;
+    var float wpi;
+    var float wi;
+    var float theta;
+    var float tempr;
+    var float tempi;
+
+    // read in samples with reverse-binary reindexing
+    j = 0;
+    for ( i = 0; i < 128; i = i + 1 )
+    {
+      datar[i] = Path.GetNodeY( 0, j ) / 100.0;
+      datai[i] = 0.0;
+
+      m = 64;
+      while ( m >= 1 && j >= m )
+      {
+        j = j - m;
+        m = m >> 1;
+      }
+      j = j + m;
+    };
+
+    mmax=1;
+    while ( mmax < 128 )
+    {
+      istep = mmax << 1;
+      theta = -( 90.0 / (float)mmax ); // math_sin is working with degrees not radians
+      wtemp = math_sin( theta );
+      wpr = -2.0 * wtemp * wtemp;
+      wpi = math_sin( 2.0 * theta );
+      wr = 1.0;
+      wi = 0.0;
+      for ( m = 0; m < mmax; m = m + 1 )
+      {
+        for ( i = m; i < 128; i += istep)
+        {
+          j = i + mmax;
+          tempr = wr * datar[j] - wi * datai[j];
+          tempi = wr * datai[j] + wi * datar[j];
+
+          datar[j] = datar[i] - tempr;
+          datai[j] = datai[i] - tempi;
+          datar[i] += tempr;
+          datai[i] += tempi;
+        }
+        wtemp = wr;
+        wr += wr * wpr - wi * wpi;
+        wi += wi * wpr + wtemp * wpi;
+      }
+      mmax = istep;
+    }
+
+    // and store it in Spectrum
+    var float step = (float)StrokePathS.Bounds.w / 63.0;
+    var float x = 0.0;
+    var float y;
+    var float yfactor = (float)StrokePathS.Bounds.h / 12.8; // amplify spectrum by 5 to give better reading
+
+    for ( i = 0; i < 64; i = i + 1 )
+    {
+      y = math_sqrt( datar[i] * datar[i] + datai[i] * datai[i] ) * yfactor;
+      if ( i == 0)
+        Spectrum.Begin( 0, x, y );
+      else
+        Spectrum.AddLine( 0, x, y );
+      x = x + step;
+    }
+
+    // also create a copy with a closed contour below the spectrum so a nice gradient can be added
+    SpectrumFill.InitSubPath( 0, 67 );
+    SpectrumFill.AddCopy( 0, Spectrum, 0, 0, 63 );
+    SpectrumFill.AddLine( 0, (float)FillPathS.Bounds.w, 0.0 );
+    SpectrumFill.AddLine( 0, 0.0, 0.0 );
+    SpectrumFill.Close( 0 );
+
+  }
+
+  $rect <20,20,160,60>
+  object Views::Rectangle Background
+  {
+    preset Bounds = <0,0,480,272>;
+    preset Color = #5F5F5FFF;
+  }
+
+  $rect <700,0,900,40>
+  object Wiring::Core uc;
+
+  $rect <700,160,900,200>
+  object Graphics::Path Path;
+
+  $rect <20,20,160,60>
+  object Views::Border Border
+  {
+    preset Bounds = <46,10,470,114>;
+    preset Width = 2;
+    preset Color = #C7C7C7FF;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Rectangle Rectangle
+  {
+    preset Bounds = <48,12,468,112>;
+    preset Color = #060B38FF;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Line Line
+  {
+    preset Point2 = <468,62>;
+    preset Point1 = <48,62>;
+    preset Width = 2;
+    preset Color = #0E87FF66;
+  }
+
+  $rect <20,20,160,60>
+  object Views::StrokePath StrokePath
+  {
+    preset Bounds = <48,12,468,112>;
+    preset Color = #A0FF20FF;
+    preset Offset = <0,50>;
+    preset Width = 4;
+    preset Path = Path;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Border BorderS
+  {
+    preset Bounds = <46,124,470,262>;
+    preset Width = 2;
+    preset Color = #C7C7C7FF;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Rectangle RectangleS
+  {
+    preset Bounds = <48,126,468,260>;
+    preset Color = #060B38FF;
+  }
+
+  $rect <20,20,160,60>
+  object Views::StrokePath StrokePathS
+  {
+    preset Bounds = <48,126,468,260>;
+    preset Color = #A0FF20FF;
+    preset Offset = <0,0>;
+    preset FlipY = true;
+    preset Path = Spectrum;
+    preset Width = 3;
+  }
+
+  $rect <20,20,160,60>
+  object Views::FillPath FillPathS
+  {
+    preset Bounds = <48,126,468,260>;
+    preset ColorBL = #1BCCFF00;
+    preset ColorBR = #1BCCFF00;
+    preset ColorTR = #1BCCFFFF;
+    preset ColorTL = #1BCCFFFF;
+    preset FlipY = true;
+    preset FillRule = Graphics::FillRule.NonZero;
+    preset Path = SpectrumFill;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Text Text
+  {
+    preset Bounds = <35,53,42,69>;
+    preset AutoSize = true;
+    preset Alignment = Views::TextAlignment[AlignHorzRight, AlignVertCenter];
+    preset String = "0";
+    preset Font = Application::Font;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Text Text1
+  {
+    preset Bounds = <35,2,42,18>;
+    preset AutoSize = true;
+    preset Alignment = Views::TextAlignment[AlignHorzRight, AlignVertCenter];
+    preset String = "+1";
+    preset Font = Application::Font;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Text Text2
+  {
+    preset Bounds = <35,103,42,119>;
+    preset AutoSize = true;
+    preset Alignment = Views::TextAlignment[AlignHorzRight, AlignVertCenter];
+    preset String = "-1";
+    preset Font = Application::Font;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Text Text3
+  {
+    preset Bounds = <35,252,42,268>;
+    preset AutoSize = true;
+    preset Alignment = Views::TextAlignment[AlignHorzRight, AlignVertCenter];
+    preset String = "0";
+    preset Font = Application::Font;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Text Text4
+  {
+    preset Bounds = <35,119,42,135>;
+    preset AutoSize = true;
+    preset Alignment = Views::TextAlignment[AlignHorzRight, AlignVertCenter];
+    preset String = "0.2";
+    preset Font = Application::Font;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Text Text5
+  {
+    preset Bounds = <-33,12,67,111>;
+    preset Orientation = Views::Orientation.Rotated_90;
+    preset String = "Signal";
+    preset Font = Application::Font;
+  }
+
+  $rect <20,20,160,60>
+  object Views::Text Text6
+  {
+    preset Bounds = <-33,145,67,244>;
+    preset Orientation = Views::Orientation.Rotated_90;
+    preset String = "Spectrum";
+    preset Font = Application::Font;
+  }
+
+  $rect <700,240,900,280>
+  object Graphics::Path SpectrumFill;
+
+  $rect <700,200,900,240>
+  object Graphics::Path Spectrum;
+}
+
+// This Unit contains the example application which reads periodically the analog \
+// inputs A5 and A6
+// and moves around a spot based on their value.
+note legend Note1
+{
+  attr Bounds = <20,0,710,60>;
+}
+
+// This is a font resource.
+$rect <230,70,430,110>
+$output false
+resource Resources::Font Font
+{
+  attr fontname FontName = Arial;
+  attr fontheight Height = 16;
+  attr fontquality Quality = High;
+  attr fontranges Ranges = 0x20-0xFF;
+  attr fontaspectratio AspectRatio = 1.0;
+  attr fontbold Bold = false;
+  attr fontitalic Italic = false;
+  attr fontkerning Kerning = true;
+  attr fontheightmode HeightMode = Compatible;
+  attr fontrowdistance RowDistance;
+}

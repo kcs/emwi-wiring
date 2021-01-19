@@ -16,22 +16,22 @@ class Core
   // Do not use outside the class.
   note group noteInternal
   {
-    attr Bounds = <640,360,940,560>;
+    attr Bounds = <10,630,310,830>;
   }
 
   // Internal variables.
   note group noteInternal1
   {
-    attr Bounds = <640,150,940,350>;
+    attr Bounds = <10,420,690,620>;
   }
 
-  $rect <690,220,890,260>
+  $rect <60,490,260,530>
   var Wiring::PinsClass pins = Wiring::Pins;
 
   // Core Wiring functions
   note group noteCore
   {
-    attr Bounds = <10,10,230,350>;
+    attr Bounds = <10,10,690,350>;
   }
 
   // This method sets (aState = true) or resets (aState = false) a digital output \
@@ -100,19 +100,19 @@ class Core
     return aResolution;
   }
 
-  $rect <690,260,890,300>
+  $rect <60,530,260,570>
   var uint32 adc_resolution = 0;
 
   // Core Wiring properties
   note group noteCore1
   {
-    attr Bounds = <240,10,460,350>;
+    attr Bounds = <710,10,930,350>;
   }
 
-  $rect <250,210,450,250>
+  $rect <720,210,920,250>
   property int32 AnalogReadResolution;
 
-  $rect <250,250,450,290>
+  $rect <720,250,920,290>
   onset AnalogReadResolution
   {
     // make sure it is within range
@@ -134,7 +134,7 @@ class Core
 
   }
 
-  $rect <680,440,880,480>
+  $rect <50,710,250,750>
   method void selectADCResolution( arg int32 aRes )
   {
     // this function will select the best suited ADC resolution available on the underlying hardware
@@ -214,7 +214,7 @@ class Core
 
   }
 
-  $rect <690,300,890,340>
+  $rect <60,570,260,610>
   var int32 adc_correction = 0;
 
   // Read the ADC conversion result from an analog input pin. Sampling will not work \
@@ -249,6 +249,33 @@ class Core
       return (((uint32)a + 1) >> -adc_correction ) - 1;
     }
   }
+
+  // This function returns a random 32 bit unsigned integer.
+  // Opposed to normal Arduino functions, this function will return a true random \
+  // number
+  // instead of a pseudo-random number. While Arduino function where devised for
+  // AVR microcontrollers and needed a standard C++ implementation for a random number
+  // and could me made random by using a randomSeed from an unconnected analog pin,
+  // the STM32F746 has a built-in true random number generator, so it is much more
+  // handy to use it for generating better random numbers.
+  // 
+  // If pseudo-random numbers are really needed, the standard chora math_rand function
+  // can be used instead of the Wiring unit.
+  $rect <250,60,450,100>
+  method uint32 random()
+  {
+    // create a RandomNumberGenerator class on the first run
+    // this way if random numbers are not needed, the RNG hardware will not
+    // get initialized
+    if ( rng == null )
+      rng = new Wiring::RandomNumberGenerator;
+
+    return rng.GenerateRandomNumber();
+
+  }
+
+  $rect <270,490,470,530>
+  var Wiring::RandomNumberGenerator rng = null;
 }
 
 $rect <220,50,420,90>
@@ -788,5 +815,79 @@ class Adc
       }
       return res;
     $endif
+  }
+}
+
+// This is a wrapper class for the STM32F7 built-in true random number generator.
+$rect <500,210,700,250>
+$output false
+class RandomNumberGenerator
+{
+  $rect <0,40,200,80>
+  inherited method Done()
+  {
+    // on platform DeInit RNG hardware
+    $if !$prototyper
+      var handle h = rng;
+      native (h)
+      {
+        __HAL_RCC_RNG_CLK_DISABLE();
+        HAL_RNG_DeInit( (RNG_HandleTypeDef *)h );
+      }
+    $endif
+
+  }
+
+  $rect <0,0,200,40>
+  inherited method Init()
+  {
+    // on the platform initialize the RNG hardware
+    $if !$prototyper
+      var handle h;
+      native ( h )
+      {
+        static RNG_HandleTypeDef rngHandle = {};
+        __HAL_RCC_RNG_CLK_ENABLE();
+
+
+        rngHandle.Instance = RNG;
+        HAL_RNG_Init( &rngHandle );
+
+        //
+
+        h = (XHandle)&rngHandle;
+      }
+      rng = h;
+    $endif
+
+  }
+
+  $rect <200,0,400,40>
+  var handle rng;
+
+  $rect <0,80,240,120>
+  method uint32 GenerateRandomNumber()
+  {
+    // in the prototyper use the built-in pseudo-random number generator
+    $if $prototyper
+      // the built in random number generator has a problem with range exceeding 32767
+      // so build the full 32 bit unsigned random number out of 4 random bytes
+      return ( (uint32)math_rand(0, 255) << 24 ) |
+             ( (uint32)math_rand(0, 255) << 16 ) |
+             ( (uint32)math_rand(0, 255) << 8 ) |
+               (uint32)math_rand(0, 255);
+    $endif
+
+    // on the platform use the RNG hardware instead
+    $if !$prototyper
+      var uint32 res;
+      var handle h = rng;
+      native ( res, h )
+      {
+        HAL_RNG_GenerateRandomNumber( (RNG_HandleTypeDef *)h, &res );
+      }        
+      return res;
+    $endif
+
   }
 }
