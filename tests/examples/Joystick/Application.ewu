@@ -30,10 +30,10 @@ class Application : Core::Root
   $rect <700,40,900,80>
   slot updatePos
   {
-    var uint32 x = uc.analogRead( 21 );
-    var uint32 y = uc.analogRead( 20 );
+    var int32 x = (int32)uc.analogRead( 21 );
+    var int32 y = (int32)uc.analogRead( 20 );
 
-
+    Image.Bounds.origin = point( Bounds.w * x / 4096, Bounds.h * y / 4096 ) - Image.Bounds.orect.center;
   }
 
   $rect <20,20,160,60>
@@ -65,7 +65,7 @@ class Application : Core::Root
   $rect <20,20,160,60>
   object Views::Image Image
   {
-    preset Bounds = <338,152,388,202>;
+    preset Bounds = <198,94,282,178>;
     preset AutoSize = true;
     preset Color = #FFA000FF;
     preset FrameNumber = 12;
