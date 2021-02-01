@@ -1,0 +1,2 @@
+1. Cooley, J.W., Tukey,  J.W. , _An algorithm for the machine calculation of complex Fourier series_, Math. Comp., vol. 19, pp. 297-301, 1965
+2. Press, W.H., Teukolsky, S.A., Vetterling, W.T., Flannery, B.P., _Numerical Recipes in C++_, Cambrige Univ. Press, 2002
