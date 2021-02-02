@@ -1,0 +1,155 @@
+﻿$version 10.00
+
+// This is the root component of the entire GUI application.
+$rect <20,70,220,110>
+$output false
+class Application : Core::Root
+{
+  $rect <500,0,690,40>
+  inherited method Init()
+  {
+    TwoWire.begin();
+    TwoWire.beginTransmission( 0x50 ); // EEPROM I²C address
+    TwoWire.write( 0x00 ); // variable address inside EEPROM - high byte
+    TwoWire.write( 0x10 ); // variable address inside EEPROM = low byte
+    TwoWire.endTransmission();
+    TwoWire.requestFrom( 0x50, 2 );
+    Value = (int32)TwoWire.read() << 8 | (int32)TwoWire.read();
+
+  }
+
+  $rect <500,110,700,150>
+  inherited property Bounds = <0,0,480,272>;
+
+  $rect <20,20,160,60>
+  object Views::Rectangle Background
+  {
+    preset Bounds = <0,0,480,272>;
+    preset Color = #5F5F5FFF;
+  }
+
+  $rect <690,0,890,40>
+  object Wiring::Core uc;
+
+  $rect <20,20,160,60>
+  object Views::Text Text
+  {
+    preset Bounds = <73,85,415,168>;
+    preset String = "0";
+    preset Font = Application::Font;
+  }
+
+  $rect <690,40,890,80>
+  object Wiring::TwoWire TwoWire;
+
+  $rect <20,20,160,60>
+  object Views::Rectangle Rectangle
+  {
+    preset Bounds = <20,222,460,247>;
+    preset ColorBL = #0028FFFF;
+    preset ColorBR = #FF3600FF;
+    preset ColorTR = #FF3600FF;
+    preset ColorTL = #0028FFFF;
+  }
+
+  $rect <20,20,160,60>
+  object Views::FillPath FillPath
+  {
+    preset Bounds = <0,192,480,247>;
+    preset Color = #E3FF00FF;
+    preset Offset = <20,-25>;
+    preset FlipY = true;
+    preset Path = Handle;
+  }
+
+  $rect <700,110,900,150>
+  object Graphics::Path Handle;
+
+  $rect <20,20,160,60>
+  object Core::SimpleTouchHandler SimpleTouchHandler
+  {
+    preset Point4 = <0,192>;
+    preset Point3 = <480,192>;
+    preset Point2 = <480,247>;
+    preset Point1 = <0,247>;
+    preset OnDrag = Slide;
+    preset OnRelease = Slide;
+  }
+
+  $rect <495,171,695,211>
+  slot Slide
+  {
+    Value = SimpleTouchHandler.CurrentPos.x - 20;
+  }
+
+  $rect <700,170,900,210>
+  property int32 Value = -1;
+
+  $rect <700,210,900,250>
+  onset Value
+  {
+    // range check
+    if ( value < 0 )
+      value = 0;
+    if ( value > 440 )
+      value = 440;
+
+    // The value doesn't change - nothing to do.
+    if ( pure Value == value )
+      return;
+
+    var bool store = pure Value >= 0;
+
+    // Remember the property's new value.
+    pure Value = value;
+
+    // display on screen
+    Text.String = string( value );
+
+    // and move handle as well
+    Handle.InitSubPath( 0, 4 );
+    Handle.InitMatrix();
+    Handle.Translate( (float)value, 0 );
+    Handle.Begin( 0, 0.0, 0.0 );
+    Handle.AddLine( 0, 10.0, 20.0 );
+    Handle.AddLine( 0, -10.0, 20.0 );
+    Handle.Close( 0 );
+
+    // store to EEPROM the new value
+    if ( store )
+    {
+      TwoWire.beginTransmission( 0x50 );
+      TwoWire.write( 0x00 );
+      TwoWire.write( 0x10 );
+      TwoWire.write( (uint8)(( value >> 8 ) & 0xFF) );
+      TwoWire.write( (uint8)( value & 0xFF ) );
+      TwoWire.endTransmission();
+    }
+
+  }
+}
+
+// This Unit contains the example application which reads periodically the analog \
+// inputs A5 and A6
+// and moves around a spot based on their value.
+note legend Note1
+{
+  attr Bounds = <20,0,710,60>;
+}
+
+// This is a font resource.
+$rect <230,70,430,110>
+$output false
+resource Resources::Font Font
+{
+  attr fontname FontName = Impact;
+  attr fontheight Height = 80;
+  attr fontquality Quality = High;
+  attr fontranges Ranges = 0x20-0xFF;
+  attr fontaspectratio AspectRatio = 1.0;
+  attr fontbold Bold = true;
+  attr fontitalic Italic = false;
+  attr fontkerning Kerning = true;
+  attr fontheightmode HeightMode = Compatible;
+  attr fontrowdistance RowDistance;
+}

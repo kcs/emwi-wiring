@@ -278,7 +278,7 @@ class Core
   var Wiring::RandomNumberGenerator rng = null;
 }
 
-$rect <220,50,420,90>
+$rect <290,50,490,90>
 $output false
 enum PinModes
 {
@@ -425,6 +425,17 @@ class Pin
     if ( pure Mode == value )
       return;
 
+    // if old mode was alternate function, then also unconnect the attached device
+    if ( ( pure Mode == Wiring::PinModes.ALTERNATE_FUNCTION ||
+           pure Mode == Wiring::PinModes.ALTERNATE_FUNCTION_OD ) &&
+           value != Wiring::PinModes.ALTERNATE_FUNCTION &&
+           value != Wiring::PinModes.ALTERNATE_FUNCTION_OD &&
+           AlternateConnected != null )
+    {
+      AlternateConnected^ = false;
+      AlternateConnected = null;
+    }
+
     // Remember the property's new value.
     pure Mode = value;
 
@@ -447,15 +458,22 @@ class Pin
           {
             mode = GPIO_MODE_ANALOG;
           }
+        case Wiring::PinModes.ALTERNATE_FUNCTION:
+          native ( mode )
+          {
+            mode = GPIO_MODE_AF_PP;
+          }
+        case Wiring::PinModes.ALTERNATE_FUNCTION_OD:
+          native ( mode )
+          {
+            mode = GPIO_MODE_AF_OD;
+          }
         default: ;
       }
 
       native ( h, i, mode, pull )
       {
         GPIO_InitTypeDef init;
-
-        /* enable port clock */
-        __HAL_RCC_GPIOI_CLK_ENABLE();
 
         /* initialize pin */
         init.Pin = i;
@@ -528,9 +546,44 @@ class Pin
     }
     $endif
   }
+
+  $rect <400,200,600,240>
+  property ^bool AlternateConnected;
+
+  $rect <400,160,600,200>
+  method void SetAlternateFunction( arg Wiring::PinModes aMode, arg int32 aAlternate, arg ^bool aOutlet )
+  {
+    // alternate functions are either Alternate or Alternate_OpenDrain mode
+    if ( aMode != Wiring::PinModes.ALTERNATE_FUNCTION && aMode != Wiring::PinModes.ALTERNATE_FUNCTION_OD )
+      return;
+
+    // set mode  directly to outlet, and call the native function directly by specifying the alternate function as well
+    pure Mode = aMode;
+
+    $if !$prototyper
+      var bool od = aMode == Wiring::PinModes.ALTERNATE_FUNCTION_OD;
+      var uint16 i = pin;
+      var handle p = port;
+      native ( aAlternate, od, p, i )
+      {
+        GPIO_InitTypeDef init;
+
+        /* initialize pin */
+        init.Pin = i;
+        init.Mode = od ? GPIO_MODE_AF_OD : GPIO_MODE_AF_PP;
+        init.Pull = GPIO_NOPULL;
+        init.Alternate = aAlternate;
+        init.Speed = GPIO_SPEED_HIGH;
+        HAL_GPIO_Init( (GPIO_TypeDef *)p, &init );
+      }
+    $endif
+
+    AlternateConnected = aOutlet;
+
+  }
 }
 
-$rect <220,130,420,170>
+$rect <290,130,490,170>
 $output false
 enum Port
 {
@@ -589,6 +642,23 @@ class PinsClass
   {
     /* this should be overwritten in the board specific variant */
     aPin;
+    throw "Unimplemented base class method";
+
+  }
+
+  // This method return the I2C peripheral associated with the pins aSDA and aSCL. \
+  // If there is no I2C peripheral on the requested pin or the pins mismatch null \
+  // is returned.
+  // The peripheral is attached to both the underlying hardware and to the TwoWire \
+  // object calling this method.
+  // If the underlying peripheral is already connected to an object it will first \
+  // be disconnected.
+  $rect <1,80,201,120>
+  method Wiring::I2c I2c( arg int32 aSDA, arg int32 aSCL )
+  {
+    /* this should be overwritten in the board specific variant */
+    aSDA;
+    aSCL;
     throw "Unimplemented base class method";
 
   }
@@ -701,6 +771,50 @@ vclass Pins_STM32F746_DISCO : Wiring::PinsClass
 
   }
 
+  $rect <0,120,200,160>
+  inherited method I2c()
+  {
+    $if $prototyper
+      aSDA;
+      aSCL;
+    $endif
+
+    $if !$prototyper
+    // only pins 14 and 15 are valid for I²C on STM32F746 Discovery board
+    if ( aSDA == 14 && aSCL == 15 )
+    {
+      if ( i2c1 == null )
+      {
+        i2c1 = new Wiring::I2c;
+        var handle h;
+        native ( h )
+        {
+          h = (XHandle)I2C1;
+          __HAL_RCC_I2C1_CLK_ENABLE();
+        }
+        i2c1.SetInstance( h );
+      }
+      //pins[14].Mode = Wiring::PinModes.ALTERNATE_FUNCTION_OD;
+      //pins[14].AlternateConnected = ^i2c1.Connected;
+      //pins[15].Mode = Wiring::PinModes.ALTERNATE_FUNCTION_OD;
+      //pins[15].AlternateConnected = ^i2c1.Connected;
+      var int32 i2c_alternate;
+      native ( i2c_alternate )
+      {
+        i2c_alternate = GPIO_AF4_I2C1;
+      }
+      pins[14].SetAlternateFunction( Wiring::PinModes.ALTERNATE_FUNCTION_OD, i2c_alternate, ^i2c1.Connected );
+      pins[15].SetAlternateFunction( Wiring::PinModes.ALTERNATE_FUNCTION_OD, i2c_alternate, ^i2c1.Connected );
+      i2c1.Connected = true;
+
+      return i2c1;
+    }
+    $endif
+
+    return null;
+
+  }
+
   $rect <200,40,400,80>
   array Wiring::Pin pins[ 22 ] =
   (
@@ -730,6 +844,9 @@ vclass Pins_STM32F746_DISCO : Wiring::PinsClass
 
   $rect <200,80,400,120>
   var Wiring::Adc adc3 = null;
+
+  $rect <200,120,400,160>
+  var Wiring::I2c i2c1 = null;
 }
 
 $rect <500,130,700,170>
@@ -740,7 +857,7 @@ autoobject Wiring::PinsClass Pins;
 // logical 1 on the output), LOW (resulting a logical 0 on output) or UNDEFINED (this \
 // has no effect on the output pin, and can appear when pin is routed to an alternate \
 // function).
-$rect <220,90,420,130>
+$rect <290,90,490,130>
 $output false
 enum PinState
 {
@@ -754,7 +871,7 @@ enum PinState
   item HIGH;
 }
 
-$rect <500,170,700,210>
+$rect <500,190,700,230>
 $output false
 class Adc
 {
@@ -819,7 +936,7 @@ class Adc
 }
 
 // This is a wrapper class for the STM32F7 built-in true random number generator.
-$rect <500,210,700,250>
+$rect <500,270,700,310>
 $output false
 class RandomNumberGenerator
 {
@@ -889,5 +1006,403 @@ class RandomNumberGenerator
       return res;
     $endif
 
+  }
+}
+
+// The TwoWire module offers access to the Two-Wire Interface of the microcontroller.
+$rect <10,90,210,130>
+$output false
+class TwoWire
+{
+  // Two-Wire Interface base commands
+  note group Note
+  {
+    attr Bounds = <0,0,420,210>;
+  }
+
+  // Join the two-wire bus as a master.
+  $rect <10,40,210,80>
+  method void begin()
+  {
+    // attach to the I²C peripheral
+    i2c = Wiring::Pins.I2c( SDA, SCL );
+
+  }
+
+  // Initiate a receiving aNumBytes of bytes from the slave device with address aAddress. 
+  $rect <210,80,410,120>
+  method int32 requestFrom( arg uint8 aAddress, arg uint8 aQuantity )
+  {
+    // this function is unimplemented on the prototyper
+    $if $prototyper
+      aAddress;
+      aQuantity;
+    $endif
+
+    if ( i2c == null )
+      return 0;
+
+    // create an rxBuffer, read data from slave
+    $if !$prototyper
+      var handle buf = rxBuffer;
+      native ( aQuantity, buf )
+      {
+        //uint8_t *data = (uint8_t *)buf;
+        // if there was an rx buffer which was not emptied, release it
+        if (buf)
+          EwFree( (uint8_t *)buf );
+        buf = (XHandle)EwAlloc( aQuantity );
+      }
+      rxBuffer = buf;
+    $endif
+
+    if ( i2c.masterRead( aAddress, rxBuffer, aQuantity ) )
+      rxSize = aQuantity;
+    else
+      rxSize = 0;
+    rxIndex = 0;
+
+    return rxSize;
+  }
+
+  // Returns the number of bytes available for retrieval with read().
+  $rect <210,120,410,160>
+  method int32 available()
+  {
+    return rxSize - rxIndex;
+  }
+
+  // Read 1 byte of data from the slave device.
+  $rect <210,160,410,200>
+  method uint8 read()
+  {
+    if ( rxBuffer == null || rxIndex >= rxSize )
+      return 0;
+
+    var uint8 d = 0;
+
+    $if !$prototyper
+      var handle h = rxBuffer;
+      var int32 i = rxIndex;
+      native ( d, h, i )
+      {
+        d = *((uint8_t *)h + i);
+      }
+      rxIndex++;
+      if ( rxIndex == rxSize )
+      {
+        native ( h )
+        {
+          EwFree( (uint8_t *)h );
+        }
+        rxBuffer = null;
+        rxSize = 0;
+        rxIndex = 0;
+      }
+    $endif
+
+    return d;
+  }
+
+  // Start filling the transmission buffer specifying the target slave address.
+  // 
+  // Transmission buffer is filled with write command, and actual transmission is \
+  // started with the endTransmission command.
+  $rect <10,80,210,120>
+  method void beginTransmission( arg uint8 aAddress )
+  {
+    slaveAddress = aAddress;
+    txSize = 0;
+  }
+
+  // Finish a transmission in progress and release the bus.
+  $rect <10,120,210,160>
+  method bool endTransmission()
+  {
+    // fail if no i2c interface connected
+    if ( i2c == null )
+      return false;
+
+    // address 0 for slave is reserved, so if no proper address is given do not start
+    // any transmission
+    // also if there is no data avoid transmitting anything
+    if ( slaveAddress == 0 || txSize == 0 )
+      return false;
+
+    // only initiate data transmission on target
+    var handle buf = null;
+    $if !$prototyper
+    native( buf )
+    {
+      buf = (XHandle)_this->txBuffer;
+    }
+    $endif
+    return i2c.masterWrite( slaveAddress, buf, (uint16)txSize );  
+
+  }
+
+  // Send 1 byte of data on the TWI bus.
+  $rect <10,160,210,200>
+  method int32 write( arg uint8 aData )
+  {
+    if ( txSize < txBuffer.size )
+    {
+      txBuffer[txSize] = aData;
+      txSize++;
+      return 1;
+    }
+    else
+      return 0;
+
+  }
+
+  // Module properties
+  note group Note1
+  {
+    attr Bounds = <430,0,850,210>;
+  }
+
+  // Select the pin for SDA line.
+  $rect <440,80,640,120>
+  property int32 SDA = 14;
+
+  $rect <440,120,640,160>
+  onset SDA
+  {
+    // The value doesn't change - nothing to do.
+    if ( pure SDA == value )
+      return;
+
+    // Remember the property's new value.
+    pure SDA = value;
+
+    // TO DO:
+    // 
+    // Now you can handle the alternation of the property.
+  }
+
+  // Select pin for SCL line.
+  $rect <640,80,840,120>
+  property int32 SCL = 15;
+
+  $rect <640,120,840,160>
+  onset SCL
+  {
+    // The value doesn't change - nothing to do.
+    if ( pure SCL == value )
+      return;
+
+    // Remember the property's new value.
+    pure SCL = value;
+
+    // TO DO:
+    // 
+    // Now you can handle the alternation of the property.
+  }
+
+  $rect <10,280,210,320>
+  var Wiring::I2c i2c = null;
+
+  // Internal variables
+  note group Note2
+  {
+    attr Bounds = <0,230,630,450>;
+  }
+
+  $rect <210,280,410,320>
+  var handle rxBuffer = null;
+
+  $rect <210,320,410,360>
+  var int32 rxSize = 0;
+
+  $rect <210,360,410,400>
+  var int32 rxIndex = 0;
+
+  $rect <410,360,610,400>
+  var uint8 slaveAddress = 0;
+
+  $rect <410,280,610,320>
+  array uint8 txBuffer[ 32 ];
+
+  $rect <410,320,610,360>
+  var int32 txSize;
+
+  $rect <410,400,610,440>
+  method handle txBufferHandle()
+  {
+    $if !$prototyper
+      var handle h;
+      native ( h )
+      {
+        h = (XHandle)_this->txBuffer;
+      }
+      return h;
+    $else
+      return null;
+    $endif
+  }
+
+  $rect <10,400,210,440>
+  slot detachPin
+  {
+    sender; /* the method is called from the sender object */
+  }
+}
+
+$rect <500,230,700,270>
+$output false
+class I2c
+{
+  $rect <0,40,200,80>
+  inherited method Done()
+  {
+    $if !$prototyper
+    var handle h = handle;
+    native( h )
+    {
+      HAL_I2C_DeInit( (I2C_HandleTypeDef *)h );
+      EwFree( (I2C_HandleTypeDef *)h );
+    }
+    $endif
+
+  }
+
+  $rect <0,0,200,40>
+  inherited method Init()
+  {
+    $if !$prototyper
+    var handle h;
+    native( h )
+    {
+      h = (XHandle)EwAlloc( sizeof(I2C_HandleTypeDef) );
+      EwZero( (void *)h, sizeof(I2C_HandleTypeDef) );
+    }
+    handle = h;
+    $endif
+
+  }
+
+  $rect <200,100,400,140>
+  var handle handle;
+
+  $rect <0,140,200,180>
+  method bool masterWrite( arg uint8 aAddress, arg handle aData, arg uint16 aSize )
+  {
+    $if $prototyper
+      // unimplemented in the prototyper
+      aAddress;
+      aData;
+      aSize;
+
+      return false;
+    $endif
+
+    $if !$prototyper
+      var handle h = handle;
+      var bool res = false;
+      var int32 code;
+
+      native( h, aAddress, aData, aSize, code )
+      {
+        // right now use only 7 bit addresses
+        // address has to be left aligned
+        aAddress <<= 1;
+        if ( HAL_I2C_Master_Transmit( (I2C_HandleTypeDef *)h, aAddress, (uint8_t *)aData, aSize, 1 ) == HAL_OK )
+          res = 1;
+
+        code = ((I2C_HandleTypeDef *)h)->ErrorCode;
+      }
+
+      return res;
+    $endif
+  }
+
+  $rect <0,180,200,220>
+  method bool masterRead( arg uint8 aAddress, arg handle aData, arg uint16 aSize )
+  {
+    $if $prototyper
+      // unimplemented in the prototyper
+      aAddress;
+      aData;
+      aSize;
+
+    $endif
+    if ( aData == null || aSize == 0 )
+      return false;
+
+    var bool res = false;
+
+    $if !$prototyper
+      var handle h = handle;
+
+      native( h, aAddress, aData, aSize, res )
+      {
+        // right now use only 7 bit addresses
+        // address has to be left aligned
+        aAddress <<= 1;
+        if ( HAL_I2C_Master_Receive( (I2C_HandleTypeDef *)h, aAddress, (uint8_t *)aData, aSize, 1 ) == HAL_OK )
+          res = 1;
+      }
+    $endif
+
+    return res;
+  }
+
+  // This function is used by the Pins interface to find and attach the corresponding \
+  // I2C peripheral to this object.
+  $rect <200,0,400,40>
+  method void SetInstance( arg handle aInstance )
+  {
+    $if !$prototyper
+    var handle h = handle;
+    native ( aInstance, h )
+    {
+      ((I2C_HandleTypeDef *)h)->Instance = (I2C_TypeDef *)aInstance;
+    }
+    $endif
+  }
+
+  $rect <400,0,600,40>
+  property bool Connected = false;
+
+  $rect <400,40,600,80>
+  onset Connected
+  {
+    // The value doesn't change - nothing to do.
+    if ( pure Connected == value )
+      return;
+
+    // Remember the property's new value.
+    pure Connected = value;
+
+    // if module disconnected from the pins, notify drivers using this
+    if ( !value )
+    {
+      notifyobservers ^Connected;
+      // also deinit the handle
+     $if !$prototyper
+      var handle h = handle;
+      native( h )
+      {
+        HAL_I2C_DeInit( (I2C_HandleTypeDef *)h );
+      }
+    }
+    else
+    {
+      // when connected, also init the handle
+      // right now hardcoded to master 7bit addressing mode, 100kHz clock
+      var handle h = handle;
+      native( h )
+      {
+        I2C_HandleTypeDef *handle = (I2C_HandleTypeDef *)h;
+
+        handle->Init.Timing = 0x40912732ul;
+        handle->Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+        handle->Mode = HAL_I2C_MODE_MASTER;
+
+        HAL_I2C_Init( handle );
+      }
+    $endif
+    }
   }
 }
