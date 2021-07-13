@@ -16,16 +16,16 @@ class Core
   // Do not use outside the class.
   note group noteInternal
   {
-    attr Bounds = <10,630,310,830>;
+    attr Bounds = <710,360,1010,560>;
   }
 
   // Internal variables.
   note group noteInternal1
   {
-    attr Bounds = <10,420,690,620>;
+    attr Bounds = <10,360,690,560>;
   }
 
-  $rect <60,490,260,530>
+  $rect <30,400,230,440>
   var Wiring::PinsClass pins = Wiring::Pins;
 
   // Core Wiring functions
@@ -94,13 +94,15 @@ class Core
   // If the hardware does not support the given resolution then a lower resolution \
   // will be used on the actual read and then upscaled to the requested resolution.
   $rect <20,210,220,250>
-  method int32 analogReadResolution( arg int32 aResolution )
+  method void analogReadResolution( arg int32 aResolution )
   {
-    /* The template just returns the given argument... */
-    return aResolution;
+    /* this is just a wrapper for compatibility purposes 
+       the EmWi way is to use the corresponding property */
+    AnalogReadResolution = aResolution;
+
   }
 
-  $rect <60,530,260,570>
+  $rect <30,440,230,480>
   var uint32 adc_resolution = 0;
 
   // Core Wiring properties
@@ -134,7 +136,7 @@ class Core
 
   }
 
-  $rect <50,710,250,750>
+  $rect <720,440,920,480>
   method void selectADCResolution( arg int32 aRes )
   {
     // this function will select the best suited ADC resolution available on the underlying hardware
@@ -214,7 +216,7 @@ class Core
 
   }
 
-  $rect <60,570,260,610>
+  $rect <30,480,230,520>
   var int32 adc_correction = 0;
 
   // Read the ADC conversion result from an analog input pin. Sampling will not work \
@@ -274,11 +276,36 @@ class Core
 
   }
 
-  $rect <270,490,470,530>
+  $rect <250,400,450,440>
   var Wiring::RandomNumberGenerator rng = null;
+
+  // Write an analog value to the output. Output can be either a DAC (usually not \
+  // available on Arduino header) or a PWM output.
+  $rect <20,290,220,330>
+  method uint32 analogWrite( arg int32 aPin, arg int32 aValue )
+  {
+    // ToDo
+  }
+
+  // This function remaps a number from one range to another range. Input number \
+  // aX is remapped from range (aInFrom .. aInTo) into range (aOutFrom .. aOutTo).
+  // Remapping is done solely with integer computations so especially in tight ranges \
+  // it can introduce some rather high errors.
+  // 
+  // The utility of this function is very low, anyone could do better with just plain \
+  // old linear equations, but for some onknown reason it is
+  // quite popular among Arduino developers (probably because they tend to not really \
+  // know what they are doing), so it is also inserted into this module.
+  $rect <250,250,450,290>
+  method int32 map( arg int32 aX, arg int32 aInFrom, arg int32 aInTo, arg int32 aOutFrom, arg int32 aOutTo )
+  {
+    /* just the very same function as described in arduino manual */
+    return (aX - aInFrom) * (aOutTo - aOutFrom) / (aInTo - aInFrom) + aOutFrom;
+
+  }
 }
 
-$rect <290,50,490,90>
+$rect <220,50,420,90>
 $output false
 enum PinModes
 {
@@ -333,7 +360,7 @@ enum PinModes
   }
 }
 
-$rect <500,50,700,90>
+$rect <430,50,630,90>
 $output false
 class Pin
 {
@@ -583,7 +610,7 @@ class Pin
   }
 }
 
-$rect <290,130,490,170>
+$rect <220,130,420,170>
 $output false
 enum Port
 {
@@ -621,7 +648,7 @@ enum Port
   item K;
 }
 
-$rect <500,90,700,130>
+$rect <430,90,630,130>
 $output false
 class PinsClass
 {
@@ -665,7 +692,7 @@ class PinsClass
 }
 
 // Pin mapping on the STM23F746NG Discovery board
-$rect <700,90,940,130>
+$rect <630,90,870,130>
 $variant STM32F746
 vclass Pins_STM32F746_DISCO : Wiring::PinsClass
 {
@@ -849,7 +876,7 @@ vclass Pins_STM32F746_DISCO : Wiring::PinsClass
   var Wiring::I2c i2c1 = null;
 }
 
-$rect <500,130,700,170>
+$rect <430,130,630,170>
 $output false
 autoobject Wiring::PinsClass Pins;
 
@@ -857,7 +884,7 @@ autoobject Wiring::PinsClass Pins;
 // logical 1 on the output), LOW (resulting a logical 0 on output) or UNDEFINED (this \
 // has no effect on the output pin, and can appear when pin is routed to an alternate \
 // function).
-$rect <290,90,490,130>
+$rect <220,90,420,130>
 $output false
 enum PinState
 {
@@ -871,7 +898,7 @@ enum PinState
   item HIGH;
 }
 
-$rect <500,190,700,230>
+$rect <430,190,630,230>
 $output false
 class Adc
 {
@@ -936,7 +963,7 @@ class Adc
 }
 
 // This is a wrapper class for the STM32F7 built-in true random number generator.
-$rect <500,270,700,310>
+$rect <430,270,630,310>
 $output false
 class RandomNumberGenerator
 {
@@ -1249,7 +1276,7 @@ class TwoWire
   }
 }
 
-$rect <500,230,700,270>
+$rect <430,230,630,270>
 $output false
 class I2c
 {

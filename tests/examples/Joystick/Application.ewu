@@ -33,7 +33,11 @@ class Application : Core::Root
     var int32 x = (int32)uc.analogRead( 21 );
     var int32 y = (int32)uc.analogRead( 20 );
 
-    Image.Bounds.origin = point( Bounds.w * x / 4096, Bounds.h * y / 4096 ) - Image.Bounds.orect.center;
+    // direct computation
+    // Image.Bounds.origin = point( Bounds.w * x / 4096, Bounds.h * y / 4096 ) - Image.Bounds.orect.center;
+    // same computation using the map function
+    Image.Bounds.origin = point( uc.map( x, 0, 4095, 0, Bounds.w ), uc.map( y, 0, 4095, 0, Bounds.h ) ) - Image.Bounds.orect.center;
+
   }
 
   $rect <20,20,160,60>
